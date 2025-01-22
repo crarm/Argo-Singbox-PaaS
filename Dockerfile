@@ -1,5 +1,10 @@
-# 使用一个基础镜像
-FROM alpine:latest
+FROM ubuntu
+EXPOSE 80
+WORKDIR /app
+USER root
 
-# 运行 echo 命令
-CMD ["echo", "hello world"]
+COPY entrypoint.sh ./
+
+RUN apt-get update && apt-get install -y wget curl unzip iproute2 systemctl
+
+ENTRYPOINT [ "/usr/bin/bash", "entrypoint.sh" ]
