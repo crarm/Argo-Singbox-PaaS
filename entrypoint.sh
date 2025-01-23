@@ -252,4 +252,4 @@ echo -e "\n 节点保存在文件: /app/list \n"
 echo -e "\n↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑\n"
 
 # 运行 Xray
-nohup ./${RANDOM_NAME} run -c config.json --logfile temp.log>/dev/null 2>&1 &
+nohup ./${RANDOM_NAME} run -config config.json --logfile temp.log>/dev/null 2>&1 &
