@@ -219,7 +219,7 @@ rm -f temp.tar.gz
 # 显示节点信息
 sleep 15
 #ARGO=$(get_argodomain)
-ARGO={{KOYEB_PUBLIC_DOMAIN}}
+ARGO=${KOYEB_PUBLIC_DOMAIN}
 cat > list << EOF
 *******************************************
 V2-rayN:
