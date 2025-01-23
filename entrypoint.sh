@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 默认各参数值，请自行修改.(注意:伪装路径不需要 / 符号开始,为避免不必要的麻烦,请不要使用特殊符号.)
-PORT=${PORT:-'8080'}
+PORT=${PORT:-'8000'}
 UUID=${UUID:-'de04add9-5c68-8bab-950c-08cd5320df18'}
 WSPATH=${WSPATH:-'argo'}
 ARGO_DOMAIN=${ARGO_DOMAIN:}||${KOYEB_PUBLIC_DOMAIN}
@@ -198,7 +198,7 @@ elif [[ $ARGO_AUTH =~ TunnelSecret ]]; then
 else
     args="tunnel --url http://localhost:$PORT --no-autoupdate --logfile argo.log --loglevel info"
 fi
-nohup ./${RANDOM_NAME} $args >/dev/null 2>&1 &
+./${RANDOM_NAME} $args >/dev/null 2>&1 &
 
 get_argodomain() {
   if [[ -n $ARGO_AUTH ]]; then
@@ -252,4 +252,4 @@ echo -e "\n 节点保存在文件: /app/list \n"
 echo -e "\n↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑\n"
 
 # 运行 Xray
-nohup ./${RANDOM_NAME} run -config config.json --logfile temp.log>/dev/null 2>&1 &
+./${RANDOM_NAME} run -config config.json >/dev/null 2>&1 &
