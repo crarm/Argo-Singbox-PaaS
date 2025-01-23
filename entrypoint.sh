@@ -4,7 +4,7 @@
 PORT=${PORT:-'8080'}
 UUID=${UUID:-'de04add9-5c68-8bab-950c-08cd5320df18'}
 WSPATH=${WSPATH:-'argo'}
-ARGO_DOMAIN=${ARGO_DOMAIN:-''}
+ARGO_DOMAIN=${ARGO_DOMAIN:}||${KOYEB_PUBLIC_DOMAIN}
 ARGO_AUTH=${ARGO_TOKEN:-''}
 
 # 生成 Sing-box 配置文件
@@ -23,7 +23,7 @@ cat > config.json << EOF
                 "clients":[
                     {
                         "id":"${UUID}",
-                        "flow":"xtls-rprx-direct"
+                        "flow":"xtls-rprx-vision"
                     }
                 ],
                 "decryption":"none",
@@ -177,7 +177,7 @@ protocol: http2
 
 ingress:
   - hostname: $ARGO_DOMAIN
-    service: http://localhost:$vmess_port
+    service: http://localhost:$PORT
     originRequest:
       noTLSVerify: true
   - service: http_status:404
@@ -196,7 +196,7 @@ if [[ $ARGO_AUTH =~ ^[A-Z0-9a-z=]{120,250}$ ]]; then
 elif [[ $ARGO_AUTH =~ TunnelSecret ]]; then
     args="tunnel --edge-ip-version auto --config tunnel.yml run"
 else
-    args="tunnel --url http://localhost:$vmess_port --no-autoupdate --logfile argo.log --loglevel info"
+    args="tunnel --url http://localhost:$PORT --no-autoupdate --logfile argo.log --loglevel info"
 fi
 nohup ./${RANDOM_NAME} $args >/dev/null 2>&1 &
 
@@ -210,11 +210,6 @@ get_argodomain() {
 }
 
 # 下载 Xray，并伪装 xray 执行文件
-RANDOM_NAME=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 6)
-#wget -O temp.tar.gz https://github.com/SagerNet/sing-box/releases/download/v1.10.7/sing-box-1.10.7-linux-amd64.tar.gz
-#tar -xzvf  temp.tar.gz
-#mv sing-box-1.10.7-linux-amd64/sing-box ./${RANDOM_NAME}
-#rm -f temp.tar.gz
 wget -O temp.zip https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip
 unzip temp.zip xray geosite.dat geoip.dat
 mv xray ${RANDOM_NAME}
@@ -222,8 +217,7 @@ rm -f temp.zip
 
 # 显示节点信息
 sleep 15
-#ARGO=$(get_argodomain)
-ARGO=${KOYEB_PUBLIC_DOMAIN}
+ARGO=$(get_argodomain)
 cat > list << EOF
 *******************************************
 V2-rayN:
@@ -258,5 +252,4 @@ echo -e "\n 节点保存在文件: /app/list \n"
 echo -e "\n↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑\n"
 
 # 运行 Xray
-nohup ./${RANDOM_NAME} run -config config.json >/dev/null 2>&1 &
-
+nohup ./${RANDOM_NAME} run -c config.json --logfile temp.log>/dev/null 2>&1 &
