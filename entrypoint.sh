@@ -4,16 +4,14 @@
 PORT=${PORT:-'8000'}
 UUID=${UUID:-'de04add9-5c68-8bab-950c-08cd5320df18'}
 WSPATH=${WSPATH:-'argo'}
-ARGO_DOMAIN=${ARGO_DOMAIN}||${KOYEB_PUBLIC_DOMAIN}
-ARGO_AUTH=${ARGO_TOKEN:-''}
 
-# 生成 Sing-box 配置文件
+# 生成 Xray 配置文件
 cat > config.json << EOF
 {
     "log":{
-        "disabled": true,
-        "level": "info",
-        "timestamp": true
+        "access":"/dev/null",
+        "error":"/dev/null",
+        "loglevel":"none"
     },
     "inbounds":[
         {
@@ -42,6 +40,10 @@ cat > config.json << EOF
                     {
                         "path":"/${WSPATH}-trojan",
                         "dest":3004
+                    },
+                    {
+                        "path":"/${WSPATH}-shadowsocks",
+                        "dest":3005
                     }
                 ]
             },
@@ -152,6 +154,35 @@ cat > config.json << EOF
                 ],
                 "metadataOnly":false
             }
+        },
+        {
+            "port":3005,
+            "listen":"127.0.0.1",
+            "protocol":"shadowsocks",
+            "settings":{
+                "clients":[
+                    {
+                        "method":"chacha20-ietf-poly1305",
+                        "password":"${UUID}"
+                    }
+                ],
+                "decryption":"none"
+            },
+            "streamSettings":{
+                "network":"ws",
+                "wsSettings":{
+                    "path":"/${WSPATH}-shadowsocks"
+                }
+            },
+            "sniffing":{
+                "enabled":true,
+                "destOverride":[
+                    "http",
+                    "tls",
+                    "quic"
+                ],
+                "metadataOnly":false
+            }
         }
     ],
     "dns":{
@@ -167,57 +198,25 @@ cat > config.json << EOF
 }
 EOF
 
-argo_configure() {
-  if [[ $ARGO_AUTH =~ TunnelSecret ]]; then
-    echo $ARGO_AUTH > tunnel.json
-    cat > tunnel.yml << EOF
-tunnel: $(cut -d\" -f12 <<< "$ARGO_AUTH")
-credentials-file: tunnel.json
-protocol: http2
-
-ingress:
-  - hostname: $ARGO_DOMAIN
-    service: http://localhost:$PORT
-    originRequest:
-      noTLSVerify: true
-  - service: http_status:404
-EOF
-  fi
-}
-
 # 下载并运行 Argo
-RANDOM_NAME=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 7)
 wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
-mv cloudflared-linux-amd64 ${RANDOM_NAME}
-chmod +x ${RANDOM_NAME}
-if [[ $ARGO_AUTH =~ ^[A-Z0-9a-z=]{120,250}$ ]]; then
-    #args="tunnel --edge-ip-version auto --no-autoupdate --protocol http2 run --token ${ARGO_AUTH}"
-    args="tunnel --no-autoupdate run --token ${ARGO_AUTH}"
-elif [[ $ARGO_AUTH =~ TunnelSecret ]]; then
-    args="tunnel --edge-ip-version auto --config tunnel.yml run"
-else
-    args="tunnel --url http://localhost:$PORT --no-autoupdate --logfile argo.log --loglevel info"
-fi
-./${RANDOM_NAME} $args >/dev/null 2>&1 &
-
-get_argodomain() {
-  if [[ -n $ARGO_AUTH ]]; then
-    echo "$ARGO_DOMAIN"
-  else
-    argodomain=$(cat argo.log 2>/dev/null | grep -a trycloudflare.com | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
-    echo "$argodomain"
-  fi
-}
+chmod +x cloudflared-linux-amd64
+./cloudflared-linux-amd64 tunnel --url http://localhost:${PORT} --no-autoupdate > argo.log 2>&1 &
 
 # 下载 Xray，并伪装 xray 执行文件
+RANDOM_NAME=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 6)
 wget -O temp.zip https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip
 unzip temp.zip xray geosite.dat geoip.dat
 mv xray ${RANDOM_NAME}
 rm -f temp.zip
 
+# 如果有设置哪吒探针三个变量,会安装。如果不填或者不全,则不会安装
+[ -n "${NEZHA_SERVER}" ] && [ -n "${NEZHA_PORT}" ] && [ -n "${NEZHA_KEY}" ] && wget https://raw.githubusercontent.com/naiba/nezha/master/script/install.sh -O nezha.sh && chmod +x nezha.sh && echo '0' | ./nezha.sh install_agent ${NEZHA_SERVER} ${NEZHA_PORT} ${NEZHA_KEY}
+
 # 显示节点信息
 sleep 15
-ARGO=$(get_argodomain)
+ARGO=$(cat argo.log | grep -oE "https://.*[a-z]+cloudflare.com" | sed "s#https://##")
+
 cat > list << EOF
 *******************************************
 V2-rayN:
@@ -227,6 +226,9 @@ vless://${UUID}@www.digitalocean.com:443?encryption=none&security=tls&sni=${ARGO
 vmess://$(echo "{ \"v\": \"2\", \"ps\": \"Argo-Vmess\", \"add\": \"www.digitalocean.com\", \"port\": \"443\", \"id\": \"${UUID}\", \"aid\": \"0\", \"scy\": \"none\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"${ARGO}\", \"path\": \"${WSPATH}-vmess\", \"tls\": \"tls\", \"sni\": \"${ARGO}\", \"alpn\": \"\" }" | base64 -w0)
 ----------------------------
 trojan://${UUID}@www.digitalocean.com:443?security=tls&sni=${ARGO}&type=ws&host=${ARGO}&path=%2F${WSPATH}-trojan#Argo-Trojan
+----------------------------
+ss://$(echo "chacha20-ietf-poly1305:${UUID}@www.digitalocean.com:443" | base64 -w0)@www.digitalocean.com:443#Argo-Shadowsocks
+由于该软件导出的链接不全，请自行处理如下: 传输协议: WS ， 伪装域名: ${ARGO} ，路径: /${WSPATH}-shadowsocks ， 传输层安全: tls ， sni: ${ARGO}
 *******************************************
 小火箭:
 ----------------------------
@@ -235,6 +237,8 @@ vless://${UUID}@www.digitalocean.com:443?encryption=none&security=tls&type=ws&ho
 vmess://$(echo "none:${UUID}@www.digitalocean.com:443" | base64 -w0)?remarks=Argo-Vmess&obfsParam=${ARGO}&path=/${WSPATH}-vmess&obfs=websocket&tls=1&peer=${ARGO}&alterId=0
 ----------------------------
 trojan://${UUID}@www.digitalocean.com:443?peer=${ARGO}&plugin=obfs-local;obfs=websocket;obfs-host=${ARGO};obfs-uri=/${WSPATH}-trojan#Argo-Trojan
+----------------------------
+ss://$(echo "chacha20-ietf-poly1305:${UUID}@www.digitalocean.com:443" | base64 -w0)?obfs=wss&obfsParam=${ARGO}&path=/${WSPATH}-shadowsocks#Argo-Shadowsocks
 *******************************************
 Clash:
 ----------------------------
@@ -243,6 +247,8 @@ Clash:
 - {name: Argo-Vmess, type: vmess, server: www.digitalocean.com, port: 443, uuid: ${UUID}, alterId: 0, cipher: none, tls: true, skip-cert-verify: true, network: ws, ws-opts: {path: /${WSPATH}-vmess, headers: {Host: ${ARGO}}}, udp: true}
 ----------------------------
 - {name: Argo-Trojan, type: trojan, server: www.digitalocean.com, port: 443, password: ${UUID}, udp: true, tls: true, sni: ${ARGO}, skip-cert-verify: false, network: ws, ws-opts: { path: /${WSPATH}-trojan, headers: { Host: ${ARGO} } } }
+----------------------------
+- {name: Argo-Shadowsocks, type: ss, server: www.digitalocean.com, port: 443, cipher: chacha20-ietf-poly1305, password: ${UUID}, plugin: v2ray-plugin, plugin-opts: { mode: websocket, host: ${ARGO}, path: /${WSPATH}-shadowsocks, tls: true, skip-cert-verify: false, mux: false } }
 *******************************************
 EOF
 
@@ -251,5 +257,5 @@ cat list
 echo -e "\n 节点保存在文件: /app/list \n"
 echo -e "\n↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑\n"
 
-# 运行 Xray
-./${RANDOM_NAME} run -config config.json >/dev/null 2>&1 &
+# 运行 xray
+./${RANDOM_NAME} run -config config.json
