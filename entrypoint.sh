@@ -213,7 +213,7 @@ get_argodomain() {
 RANDOM_NAME=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 6)
 wget -O temp.tar.gz https://github.com/SagerNet/sing-box/releases/download/v1.10.7/sing-box-1.10.7-linux-amd64.tar.gz
 tar -xzvf  temp.tar.gz
-mv sing-box ${RANDOM_NAME}
+mv sing-box-1.10.7-linux-amd64/sing-box ${RANDOM_NAME}
 rm -f temp.tar.gz
 
 # 显示节点信息
