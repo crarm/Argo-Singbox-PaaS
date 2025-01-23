@@ -261,5 +261,5 @@ echo -e "\n 节点保存在文件: /app/list \n"
 echo -e "\n↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑\n"
 
 # 运行 sing-box
-./${RANDOM_NAME} run -config config.json
+#./${RANDOM_NAME} run -config config.json
 
